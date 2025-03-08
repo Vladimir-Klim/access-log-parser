@@ -8,6 +8,8 @@ public class Statistics {
     private List<LogEntry> entries;
     private Set<String> existingPages;
     private Map<String, Integer> osFrequency;
+    private Set<String> nonExistingPages;
+    private Map<String, Integer> browserFrequency;
 
     public Statistics() {
         this.totalTraffic = 0;
@@ -16,6 +18,8 @@ public class Statistics {
         this.maxTime = LocalDateTime.MIN;
         this.existingPages = new HashSet<>();
         this.osFrequency = new HashMap<>();
+        this.nonExistingPages = new HashSet<>();
+        this.browserFrequency = new HashMap<>();
     }
 
     public void addEntry(LogEntry entry) {
@@ -33,6 +37,12 @@ public class Statistics {
         }
         String os = entry.getAgent().getOS();
         osFrequency.put(os, osFrequency.getOrDefault(os, 0) + 1);
+
+        if (entry.getResponseCode() == 404) {
+            nonExistingPages.add(entry.getPath());
+        }
+        String browser = entry.getAgent().getBrowser();
+        browserFrequency.put(browser, browserFrequency.getOrDefault(browser, 0) + 1);
     }
 
     public double getTrafficRate() {
@@ -73,5 +83,25 @@ public class Statistics {
         }
 
         return osStats;
+    }
+
+    public Set<String> getNonExistingPages() {
+        return nonExistingPages;
+    }
+
+    public Map<String, Double> getBrowserStatistics() {
+        Map<String, Double> browserStats = new HashMap<>();
+
+        int totalBrowserCount = 0;
+        for (int count : browserFrequency.values()) {
+            totalBrowserCount += count;
+        }
+
+        for (Map.Entry<String, Integer> entry : browserFrequency.entrySet()) {
+            double percentage = (double) entry.getValue() / totalBrowserCount;
+            browserStats.put(entry.getKey(), percentage);
+        }
+
+        return browserStats;
     }
 }
