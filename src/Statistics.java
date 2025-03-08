@@ -1,5 +1,6 @@
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Statistics {
     private long totalTraffic;
@@ -11,6 +12,8 @@ public class Statistics {
     private Set<String> nonExistingPages;
     private Map<String, Integer> browserFrequency;
     private int errorRequestsCount;
+    private Map<Long, Integer> visitsPerSecond;
+    private Set<String> refererDomains;
 
     public Statistics() {
         this.totalTraffic = 0;
@@ -22,6 +25,8 @@ public class Statistics {
         this.nonExistingPages = new HashSet<>();
         this.browserFrequency = new HashMap<>();
         this.errorRequestsCount = 0;
+        this.visitsPerSecond = new HashMap<>();
+        this.refererDomains = new HashSet<>();
     }
 
     public void addEntry(LogEntry entry) {
@@ -48,6 +53,19 @@ public class Statistics {
 
         if (entry.getResponseCode() >= 400 && entry.getResponseCode() < 600) {
             errorRequestsCount++;
+        }
+
+        if (!entry.getAgent().isBot()) {
+            long secondOfDay = entry.getTime().toEpochSecond(java.time.ZoneOffset.UTC);
+            visitsPerSecond.put(secondOfDay, visitsPerSecond.getOrDefault(secondOfDay, 0) + 1);
+        }
+
+        String referer = entry.getReferer();
+        if (referer != null && !referer.isEmpty()) {
+            String refererDomain = extractDomain(referer);
+            if (refererDomain != null) {
+                refererDomains.add(refererDomain);
+            }
         }
     }
 
@@ -139,5 +157,35 @@ public class Statistics {
                 .count();
 
         return uniqueUserCount == 0 ? 0.0 : (double) totalVisits / uniqueUserCount;
+    }
+
+    public int getPeakVisitsPerSecond() {
+        return visitsPerSecond.values().stream()
+                .max(Integer::compare)
+                .orElse(0);
+    }
+
+    public Set<String> getRefererDomains() {
+        return refererDomains;
+    }
+
+    public int getMaxVisitsPerUser() {
+        Map<String, Long> userVisitCounts = entries.stream()
+                .filter(entry -> !entry.getAgent().isBot())
+                .collect(Collectors.groupingBy(LogEntry::getIpAddr, Collectors.counting()));
+
+        return userVisitCounts.values().stream()
+                .mapToInt(Long::intValue)
+                .max()
+                .orElse(0);
+    }
+
+    private String extractDomain(String url) {
+        try {
+            java.net.URL u = new java.net.URL(url);
+            return u.getHost();
+        } catch (java.net.MalformedURLException e) {
+            return null;
+        }
     }
 }
