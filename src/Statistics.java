@@ -10,6 +10,7 @@ public class Statistics {
     private Map<String, Integer> osFrequency;
     private Set<String> nonExistingPages;
     private Map<String, Integer> browserFrequency;
+    private int errorRequestsCount;
 
     public Statistics() {
         this.totalTraffic = 0;
@@ -20,6 +21,7 @@ public class Statistics {
         this.osFrequency = new HashMap<>();
         this.nonExistingPages = new HashSet<>();
         this.browserFrequency = new HashMap<>();
+        this.errorRequestsCount = 0;
     }
 
     public void addEntry(LogEntry entry) {
@@ -43,6 +45,10 @@ public class Statistics {
         }
         String browser = entry.getAgent().getBrowser();
         browserFrequency.put(browser, browserFrequency.getOrDefault(browser, 0) + 1);
+
+        if (entry.getResponseCode() >= 400 && entry.getResponseCode() < 600) {
+            errorRequestsCount++;
+        }
     }
 
     public double getTrafficRate() {
@@ -103,5 +109,35 @@ public class Statistics {
         }
 
         return browserStats;
+    }
+
+    public double getAverageVisitsPerHour() {
+        long totalVisits = entries.stream()
+                .filter(entry -> !entry.getAgent().isBot())
+                .count();
+
+        long hoursBetween = java.time.Duration.between(minTime, maxTime).toHours();
+        return hoursBetween == 0 ? totalVisits : (double) totalVisits / hoursBetween;
+    }
+
+    public double getAverageErrorRequestsPerHour() {
+        long hoursBetween = java.time.Duration.between(minTime, maxTime).toHours();
+        if (hoursBetween == 0) return 0.0;
+
+        return (double) errorRequestsCount / hoursBetween;
+    }
+
+    public double getAverageVisitsPerUser() {
+        long uniqueUserCount = entries.stream()
+                .filter(entry -> !entry.getAgent().isBot())
+                .map(LogEntry::getIpAddr)
+                .distinct()
+                .count();
+
+        long totalVisits = entries.stream()
+                .filter(entry -> !entry.getAgent().isBot())
+                .count();
+
+        return uniqueUserCount == 0 ? 0.0 : (double) totalVisits / uniqueUserCount;
     }
 }
